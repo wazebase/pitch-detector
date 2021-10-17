@@ -2,3 +2,121 @@
   font-family: sans-serif;
   text-align: center;
 }
+li {
+  list-style: none;
+  margin-left: 15px;
+  cursor:pointer;
+}
+
+nav {
+  display: flex;
+}
+
+.dashitem {
+  cursor: pointer;
+  display: flex;
+  width: 100%;
+  height: 10%;
+  align-items: center;
+  border: 1px solid black;
+}
+.dash-title {
+  font-size: 16px;
+  margin-left: 50px;
+  width: 100%;
+}
+
+.dash-type {
+  width:100%;
+  font-size: 16px;
+  justify-self: end;
+  text-align: end;
+  margin-right: 100px;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  align-content: center;
+  justify-content: center;
+}
+.container {
+  margin-top: 40px;
+  flex-direction: column;
+  border: 1px solid black;
+  display: flex;
+  width: 50vw;
+  height: 70vh;
+  justify-self: center;
+  align-self: center;
+}
+
+.results-container {
+  flex-direction: column;
+  display: flex;
+  height: 30vh;
+  width: 100%;
+  justify-self: center;
+  align-self: center;
+}
+.inputs {
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  height: 40px;
+  margin-bottom: 20px;
+  margin-top: 30px;
+}
+
+input {
+  height: 20px;
+  margin-left: 10px;
+}
+.items-container {
+  width:100%;
+  height: 100%;
+}
+.new-teacher-session {
+  align-items: center;
+  justify-content: center;
+  display: flex;
+  justify-self: end;
+  align-self: center;
+  width: 50%;
+  height: 30px;
+  margin-bottom: 20px;
+}
+
+.session-button {
+  width:50%;
+  margin-left: 10px;
+  justify-self: end;
+  height: 30px;
+}
+
+.notes-display {
+  display: flex;
+  width: 100%;
+  height: 10vh;
+}
+
+.teacher-note-div {
+  align-self: center;
+  justify-self: center;
+  font-size: 16px;
+}
+
+.note {
+  margin-left: 5px;
+}
+
+.audio-react-recorder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+canvas {
+  align-self: center;
+  justify-self: center;
+}

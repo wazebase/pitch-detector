@@ -1,149 +1,176 @@
-import React, { useRef, useEffect, useState } from "react";
-import useAudioContext from "./use-audio-context";
-import useInterval from "./use-interval";
-import "./styles.css";
-import Waveform, { WaveformGradient } from "./waveform";
-import createWaveform from "./create-waveform";
-import ml5 from "ml5";
+import React, {useState}  from "react";
+import { RecordState } from 'audio-react-recorder'
+import TeachersPage from "./pages/TeachersPage";
+import StudentPage from "./pages/StudentPage";
+import DashboardPage from "./pages/DashboardPage";
+import Navigation from "./components/Navigation";
 
-const scale = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-function freqToMidi(f) {
-  if (!f) {
-    return;
-  }
-  var mathlog2 = Math.log(f / 440) / Math.log(2);
-  var m = Math.round(12 * mathlog2) + 69;
-  return m;
-}
-const midiToNote = midiNum => scale[midiNum % 12];
-const freqToNote = frequency => midiToNote(freqToMidi(frequency));
-const modeWithConfidence = (arr, limit) => {
-  var numMapping = {};
-  var greatestFreq = 0;
-  var mode;
-  for (const number of arr) {
-    numMapping[number] = (numMapping[number] || 0) + 1;
-
-    if (greatestFreq < numMapping[number]) {
-      greatestFreq = numMapping[number];
-      mode = number;
-    }
-  }
-
-  let modalMisses = 0;
-  for (const [key, frequency] of Object.entries(numMapping)) {
-    if (Number(key) !== mode) {
-      modalMisses += frequency;
-    }
-  }
-  return { mode, greatestFreq, modalMisses };
-};
 export default function App() {
-  const audioContextRef = useAudioContext();
-  const audioElementRef = useRef();
-  const pitchDetectorRef = useRef();
-  const [audioData, setAudioData] = useState(null);
-  const [waveform, setWaveform] = useState(null);
-  const [frequencies, setFrequencies] = useState([]);
-  useEffect(() => {
-    return;
-    if (!audioContextRef.current) {
-      return;
+  const [showDetector, setShowDetector] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [volume, setVolume] = useState(0);
+  const [recordState, setRecordState] = useState(null);
+  const [recordStore, setRecordStore] = useState([]);
+  const [accuracy, setAccuracy] = useState(0);
+  const [recordedNotesArray, setRecordedNotesArray] = useState([]);
+  const [isTeachersPage, setIsTeachersPage] = useState(false);
+  const [isStudentPage, setIsStudentPage] = useState(false);
+  const [isDashboardPage, setIsDashboardPage] = useState(true);
+  const [taskIndex, setTaskIndex] = useState(0);
+  const [taskInformation, setTaskInformation] = useState({
+      title: 'Task 1',
+      type: 'arpeggios',
+  });
+    const openStudentPage = () => {
+        setIsStudentPage(true);
+        setIsTeachersPage(false);
+        setIsDashboardPage(false);
     }
-    (async () => {
-      const response = await fetch("/88-keys.m4a");
-      const buffer = await response.arrayBuffer();
-      const audio = await audioContextRef.current.decodeAudioData(buffer);
-      setAudioData(audio);
-    })();
-  }, [audioContextRef.current]);
 
-  const [modelLoaded, setModelLoaded] = useState(false);
-  useEffect(() => {
-    return;
-    if (!audioData) {
-      return;
+    const openTeachersPage = () => {
+        setIsStudentPage(false);
+        setIsTeachersPage(true);
+        setIsDashboardPage(false);
     }
-    setWaveform(createWaveform(audioData, audioData.length / 1000));
-  }, [audioData]);
 
-  useEffect(() => {
-    return;
-    if (!audioElementRef) {
-      return;
+    const openDashboardPage = () => {
+        setIsStudentPage(false);
+        setIsTeachersPage(false);
+        setIsDashboardPage(true);
     }
-    function updatePlayHead() {}
-    audioElementRef.current.addEventListener("timeupdate", updatePlayHead);
-    pitchDetectorRef.current = ml5.pitchDetection(
-      "/models/pitch-detection/crepe",
-      audioContextRef.current,
-      audioElementRef.current.captureStream(),
-      () => setModelLoaded(true)
-    );
-    return () => {
-      audioElementRef.current.removeEventListener("timeupdate", updatePlayHead);
-    };
-  }, [audioElementRef.current]);
-  useEffect(() => {
-    (async () => {
-      const micStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false
-      });
-      pitchDetectorRef.current = ml5.pitchDetection(
-        "/models/pitch-detection/crepe",
-        audioContextRef.current,
-        micStream,
-        () => setModelLoaded(true)
-      );
-    })();
-  }, []);
-  useInterval(() => {
-    if (!pitchDetectorRef.current) {
-      return;
+
+  const startRecording = () => {
+      setRecordState(RecordState.START);
+  }
+
+  const stopRecording = () => {
+      setRecordState(RecordState.STOP);
+  }
+
+  const startSession = () => {
+      setRecordedNotesArray([]);
+      startRecording();
+      captureMicrophoneVolume();
+      setShowResult(false);
+      setShowDetector(true);
+  }
+
+  const endTeacherSession = () => {
+      stopRecording();
+      setShowDetector(!showDetector);
+      setTimeout(()=> openDashboardPage(), 300);
+  }
+
+  const endStudentSession = () => {
+      stopRecording();
+  }
+
+   const onStop = (audioData) => {
+        if (isTeachersPage) {
+            recordStore.push({notesArray: [...recordedNotesArray], audioUrl: audioData.url, ...taskInformation});
+        }
+        if (isStudentPage) {
+            setShowResult(true);
+            setShowDetector(!showDetector);
+            getAccuracy();
+        }
     }
-    pitchDetectorRef.current.getPitch((err, detectedPitch) => {
-      if (frequencies.length < 10) {
-        setFrequencies([...frequencies, detectedPitch]);
-      } else if (frequencies.length >= 10) {
-        setFrequencies([...frequencies.slice(1), detectedPitch]);
-      }
-    });
-  }, 1000 / 30);
-  const midis = frequencies.map(freqToMidi).filter(midiNum => !!midiNum);
-  const { mode: modalMidi, greatestFreq, modalMisses } = modeWithConfidence(
-    midis,
-    10
-  );
-  const confidence = (greatestFreq - 3) / Math.max(modalMisses, 1);
+
+    const getAccuracy = () => {
+        let mistakesNumber = 0;
+        const teachersNotesArray = recordStore[taskIndex].notesArray;
+        const studentNotesArray = recordedNotesArray.slice(0, teachersNotesArray.length);
+        console.log(teachersNotesArray, studentNotesArray);
+        teachersNotesArray.forEach((note, i) => {
+            if (note !== studentNotesArray[i]) {
+                mistakesNumber += 1;
+            }
+        })
+        const accuracy =
+            Math.round(((recordedNotesArray.length - mistakesNumber) / recordedNotesArray.length) * 100);
+        setAccuracy(accuracy);
+    }
+    const captureMicrophoneVolume = () => {
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false})
+          .then(function(stream) {
+              let audioContext = new AudioContext();
+              let analyser = audioContext.createAnalyser();
+              let microphone = audioContext.createMediaStreamSource(stream);
+              let javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+              analyser.smoothingTimeConstant = 0.8;
+              analyser.fftSize = 1024;
+
+              microphone.connect(analyser);
+              analyser.connect(javascriptNode);
+              javascriptNode.connect(audioContext.destination);
+              javascriptNode.onaudioprocess = function() {
+                  var array = new Uint8Array(analyser.frequencyBinCount);
+                  analyser.getByteFrequencyData(array);
+                  var values = 0;
+
+                  var length = array.length;
+                  for (var i = 0; i < length; i++) {
+                      values += (array[i]);
+                  }
+
+                  var average = values / length;
+
+                  setVolume(Math.round(average));
+                  // colorPids(average);
+              }
+          })
+          .catch(function(err) {
+              /* handle the error */
+          });
+  }
   return (
-    <div className="App">
-      {/* <audio crossOrigin="anonymous" ref={audioElementRef} src="/88-keys.m4a" /> */}
-      <div>
-        <code>{JSON.stringify(frequencies)}</code>
-      </div>
-      <div>
-        <code>{JSON.stringify(midis)}</code>
-      </div>
-      {modalMidi && confidence > 0.5 && (
-        <>
-          <p>MIDI: {modalMidi}</p>
-          <p>NOTE: {midiToNote(modalMidi)}</p>
-          <p>CONF: {confidence.toFixed(2)}</p>
-          <p>FREQ: {greatestFreq}</p>
-          <p>MISS: {modalMisses}</p>
-        </>
-      )}
-      {modelLoaded ? <p>Model Loaded</p> : <p>Model not loaded</p>}
-      {waveform ? <p>Has Waveform</p> : <p>No waveform</p>}
-      {waveform && (
-        <>
-          <div style={{ height: "154px", background: "#22a3ef" }}>
-            <Waveform waveform={waveform} />
-            <WaveformGradient />
-          </div>
-        </>
-      )}
+    <div className="app-container">
+        <Navigation openDashboardPage={openDashboardPage}
+                    openTeachersPage={openTeachersPage}
+                    openStudentPage={openStudentPage}
+        />
+        {isDashboardPage && <DashboardPage
+            recordStore={recordStore}
+            setTaskIndex={setTaskIndex}
+            setRecordedNotesArray = {setRecordedNotesArray}
+            openTeachersPage={openTeachersPage}
+            openStudentPage={openStudentPage}/>}
+        {isTeachersPage && <TeachersPage
+            taskInformation={taskInformation}
+            setTaskInformation={setTaskInformation}
+                startRecording={startRecording}
+               stopRecording={stopRecording}
+                startSession={startSession}
+                endSession={endTeacherSession}
+                onStop={onStop}
+                captureMicrophoneVolume={captureMicrophoneVolume}
+                volume={volume}
+                setVolume={setVolume}
+                showDetector={showDetector}
+                setShowDetector={setShowDetector}
+                recordState={recordState}
+                setRecordState={setRecordState}
+                recordedNotesArray={recordedNotesArray}
+                setRecordedNotesArray={setRecordedNotesArray} />}
+        {isStudentPage && <StudentPage
+            task={recordStore[taskIndex]}
+            startRecording={startRecording}
+            stopRecording={stopRecording}
+            startSession={startSession}
+            endSession={endStudentSession}
+            onStop={onStop}
+            showResult={showResult}
+            captureMicrophoneVolume={captureMicrophoneVolume}
+            volume={volume}
+            setVolume={setVolume}
+            accuracy = {accuracy}
+            showDetector={showDetector}
+            setShowDetector={setShowDetector}
+            recordState={recordState}
+            setRecordState={setRecordState}
+            recordedNotesArray={recordedNotesArray}
+            setRecordedNotesArray={setRecordedNotesArray} />}
     </div>
   );
 }
